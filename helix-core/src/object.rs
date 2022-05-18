@@ -2,7 +2,7 @@ use crate::{Range, RopeSlice, Selection, Syntax};
 use tree_sitter::Node;
 
 pub fn expand_selection(syntax: &Syntax, text: RopeSlice, selection: Selection) -> Selection {
-    select_node_impl(syntax, text, selection, |descendant, from, to| {
+    select_node_impl(syntax, text, selection, false, |descendant, from, to| {
         if descendant.start_byte() == from && descendant.end_byte() == to {
             descendant.parent()
         } else {
@@ -12,7 +12,7 @@ pub fn expand_selection(syntax: &Syntax, text: RopeSlice, selection: Selection) 
 }
 
 pub fn shrink_selection(syntax: &Syntax, text: RopeSlice, selection: Selection) -> Selection {
-    select_node_impl(syntax, text, selection, |descendant, _from, _to| {
+    select_node_impl(syntax, text, selection, false, |descendant, _from, _to| {
         descendant.child(0).or(Some(descendant))
     })
 }
@@ -22,11 +22,12 @@ pub fn select_sibling<F>(
     text: RopeSlice,
     selection: Selection,
     sibling_fn: &F,
+    extend: bool,
 ) -> Selection
 where
     F: Fn(Node) -> Option<Node>,
 {
-    select_node_impl(syntax, text, selection, |descendant, _from, _to| {
+    select_node_impl(syntax, text, selection, extend, |descendant, _from, _to| {
         find_sibling_recursive(descendant, sibling_fn)
     })
 }
@@ -45,6 +46,7 @@ fn select_node_impl<F>(
     syntax: &Syntax,
     text: RopeSlice,
     selection: Selection,
+    extend: bool,
     select_fn: F,
 ) -> Selection
 where
@@ -68,10 +70,16 @@ where
         let from = text.byte_to_char(node.start_byte());
         let to = text.byte_to_char(node.end_byte());
 
-        if range.head < range.anchor {
+        let new_range = if range.head < range.anchor {
             Range::new(to, from)
         } else {
             Range::new(from, to)
+        };
+
+        if extend {
+            new_range.merge(range)
+        } else {
+            new_range
         }
     })
 }
