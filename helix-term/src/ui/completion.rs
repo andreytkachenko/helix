@@ -4,8 +4,11 @@ use helix_view::editor::CompleteAction;
 use tui::buffer::Buffer as Surface;
 
 use std::borrow::Cow;
+use std::cell::Cell;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-use helix_core::{Change, Transaction};
+use helix_core::{Change, Selection, Transaction};
 use helix_view::{graphics::Rect, Document, Editor};
 
 use crate::commands;
@@ -68,6 +71,58 @@ impl menu::Item for CompletionItem {
     }
 }
 
+#[derive(Debug)]
+pub struct SnippetContext {
+    variables: HashMap<String, String>,
+}
+
+#[derive(Debug)]
+pub struct Snippet {
+    selection: Selection,
+    position: Cell<usize>,
+    context: SnippetContext,
+    tabstops: Vec<Selection>,
+}
+
+impl Snippet {
+    pub fn new(tpl: &str, context: SnippetContext) -> Result<Self, anyhow::Error> {
+        Ok(Self {
+            selection: Selection::new(std::iter::empty().collect(), 0),
+            context,
+            position: Cell::new(0),
+            tabstops: vec![],
+        })
+    }
+
+    pub fn eval(&self) -> String {
+        String::new()
+    }
+
+    pub fn goto_begin(&self) -> Option<Selection> {
+        self.position.set(0);
+        None
+    }
+
+    pub fn goto_next(&self) -> Option<Selection> {
+        let position = self.position.get() + 1;
+        if position < self.tabstops.len() {
+            self.position.set(position);
+            return self.tabstops.get(position).cloned();
+        }
+
+        None
+    }
+
+    pub fn goto_prev(&self) -> Option<Selection> {
+        if self.position.get() > 0 {
+            let position = self.position.get() - 1;
+            self.position.set(position);
+        }
+
+        None
+    }
+}
+
 /// Wraps a Menu.
 pub struct Completion {
     popup: Popup<Menu<CompletionItem>>,
@@ -95,7 +150,40 @@ impl Completion {
             ) -> Transaction {
                 let transaction = if let Some(edit) = &item.text_edit {
                     let edit = match edit {
-                        lsp::CompletionTextEdit::Edit(edit) => edit.clone(),
+                        lsp::CompletionTextEdit::Edit(edit) => {
+                            let mut edit = edit.clone();
+                            if edit.new_text.contains('\n') {
+                                let dl = doc
+                                    .text()
+                                    .get_line(edit.range.start.line as _)
+                                    .map(|slice| {
+                                        slice
+                                            .chars()
+                                            .filter_map(|ch| match ch {
+                                                ' ' => Some(1),
+                                                '\t' => Some(4),
+                                                _ => None,
+                                            })
+                                            .sum()
+                                    })
+                                    .unwrap_or(0);
+
+                                let mut res = String::new();
+
+                                for (idx, line) in edit.new_text.lines().enumerate() {
+                                    if idx > 0 {
+                                        for _ in 0..dl {
+                                            res.push(' ');
+                                        }
+                                    }
+                                    res.push_str(line);
+                                    res.push('\n');
+                                }
+
+                                edit.new_text = res;
+                            }
+                            edit
+                        }
                         lsp::CompletionTextEdit::InsertAndReplace(item) => {
                             unimplemented!("completion: insert_and_replace {:?}", item)
                         }
