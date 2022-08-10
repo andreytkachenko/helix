@@ -605,6 +605,8 @@ and <a href="./usage.html#textobject">textobject</a> usage.</p>
 <tr><td><code>R</code></td><td>Replace selections by clipboard contents</td><td><code>replace_selections_with_clipboard</code></td></tr>
 <tr><td><code>/</code></td><td>Global search in workspace folder</td><td><code>global_search</code></td></tr>
 <tr><td><code>?</code></td><td>Open command palette</td><td><code>command_palette</code></td></tr>
+<tr><td><code>e</code></td><td>Open or focus explorer</td><td><code>toggle_or_focus_explorer</code></td></tr>
+<tr><td><code>E</code></td><td>open explorer recursion</td><td><code>open_explorer_recursion</code></td></tr>
 </tbody></table>
 </div>
 <blockquote>
@@ -720,6 +722,37 @@ you to selectively add search terms to your selections.</p>
 <tr><td><code>Tab</code></td><td>Select next completion item</td></tr>
 <tr><td><code>BackTab</code></td><td>Select previous completion item</td></tr>
 <tr><td><code>Enter</code></td><td>Open selected</td></tr>
+</tbody></table>
+</div>
+<h1 id="file-explorer"><a class="header" href="#file-explorer">File explorer</a></h1>
+<p>Keys to use within explorer, Remapping currently not supported.</p>
+<div class="table-wrapper"><table><thead><tr><th>Key</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>Escape</code></td><td>Back to editor</td></tr>
+<tr><td><code>Ctrl-c</code></td><td>Close explorer</td></tr>
+<tr><td><code>Enter</code></td><td>Open file or toggle dir selected</td></tr>
+<tr><td><code>b</code></td><td>Back to current root's parent</td></tr>
+<tr><td><code>f</code></td><td>Filter items</td></tr>
+<tr><td><code>z</code></td><td>Fold currrent level</td></tr>
+<tr><td><code>k</code>, <code>Shift-Tab</code>, <code>Up</code></td><td>select previous item</td></tr>
+<tr><td><code>j</code>, <code>Tab</code>, <code>Down</code></td><td>select next item</td></tr>
+<tr><td><code>h</code></td><td>Scroll left</td></tr>
+<tr><td><code>l</code></td><td>Scroll right</td></tr>
+<tr><td><code>G</code></td><td>Move to last item</td></tr>
+<tr><td><code>Ctrl-d</code></td><td>Move down half page</td></tr>
+<tr><td><code>Ctrl-u</code></td><td>Move up half page</td></tr>
+<tr><td><code>Shift-d</code></td><td>Move down a page</td></tr>
+<tr><td><code>Shift-u</code></td><td>Move up a page</td></tr>
+<tr><td><code>/</code></td><td>Search item</td></tr>
+<tr><td><code>?</code></td><td>Search item reverse</td></tr>
+<tr><td><code>n</code></td><td>Repeat last search</td></tr>
+<tr><td><code>Shift-n</code></td><td>Repeat last search reverse</td></tr>
+<tr><td><code>gg</code></td><td>Move to first item</td></tr>
+<tr><td><code>ge</code></td><td>Move to last item</td></tr>
+<tr><td><code>gc</code></td><td>Make current dir as root dir</td></tr>
+<tr><td><code>mf</code></td><td>Create new file under current item's parent</td></tr>
+<tr><td><code>md</code></td><td>Create new dir  under current item's parent</td></tr>
+<tr><td><code>rf</code></td><td>Remove file selected</td></tr>
+<tr><td><code>rd</code></td><td>Remove dir selected</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="commands"><a class="header" href="#commands">Commands</a></h1>
 <p>Command mode can be activated by pressing <code>:</code>, similar to vim. Built-in commands:</p>
@@ -855,7 +888,7 @@ Languages</a> guide for more language configuration information.</p>
 <tr><td>jsx</td><td>✓</td><td>✓</td><td>✓</td><td><code>typescript-language-server</code></td></tr>
 <tr><td>julia</td><td>✓</td><td></td><td></td><td><code>julia</code></td></tr>
 <tr><td>kotlin</td><td>✓</td><td></td><td></td><td><code>kotlin-language-server</code></td></tr>
-<tr><td>latex</td><td>✓</td><td></td><td></td><td><code>texlab</code></td></tr>
+<tr><td>latex</td><td>✓</td><td>✓</td><td></td><td><code>texlab</code></td></tr>
 <tr><td>lean</td><td>✓</td><td></td><td></td><td><code>lean</code></td></tr>
 <tr><td>ledger</td><td>✓</td><td></td><td></td><td></td></tr>
 <tr><td>llvm</td><td>✓</td><td>✓</td><td>✓</td><td></td></tr>
@@ -1045,6 +1078,7 @@ auto-pairs = false # defaults to `true`
 </code></pre>
 <p>The default pairs are <code>(){}[]''&quot;&quot;``</code>, but these can be customized by
 setting <code>auto-pairs</code> to a TOML table:</p>
+<p>Example</p>
 <pre><code class="language-toml">[editor.auto-pairs]
 '(' = ')'
 '{' = '}'
@@ -1109,6 +1143,13 @@ newline = &quot;⏎&quot;
 render = true
 character = &quot;╎&quot;
 </code></pre>
+<h3 id="editorexplorer-section"><a class="header" href="#editorexplorer-section"><code>[editor.explorer]</code> Section</a></h3>
+<p>Sets explorer side width and style.</p>
+<p>| Key            | Description                                                                              | Default |
+| ---            | -----------                                                                              | ------- |
+| <code>column-width</code> | explorer side width                                                                      | 30      |
+| <code>style</code>        | explorer item style, tree or list                                                        | tree    |
+| <code>position</code>     | explorer widget position, embed or overlay                                               | overlay |</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="themes"><a class="header" href="#themes">Themes</a></h1>
 <p>To use a theme add <code>theme = &quot;&lt;name&gt;&quot;</code> to your <a href="./configuration.html"><code>config.toml</code></a> at the very top of the file before the first section or select it during runtime using <code>:theme &lt;name&gt;</code>.</p>
 <h2 id="creating-a-theme"><a class="header" href="#creating-a-theme">Creating a theme</a></h2>

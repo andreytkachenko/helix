@@ -256,6 +256,7 @@ auto-pairs = false # defaults to `true`
 </code></pre>
 <p>The default pairs are <code>(){}[]''&quot;&quot;``</code>, but these can be customized by
 setting <code>auto-pairs</code> to a TOML table:</p>
+<p>Example</p>
 <pre><code class="language-toml">[editor.auto-pairs]
 '(' = ')'
 '{' = '}'
@@ -320,6 +321,13 @@ newline = &quot;⏎&quot;
 render = true
 character = &quot;╎&quot;
 </code></pre>
+<h3 id="editorexplorer-section"><a class="header" href="#editorexplorer-section"><code>[editor.explorer]</code> Section</a></h3>
+<p>Sets explorer side width and style.</p>
+<p>| Key            | Description                                                                              | Default |
+| ---            | -----------                                                                              | ------- |
+| <code>column-width</code> | explorer side width                                                                      | 30      |
+| <code>style</code>        | explorer item style, tree or list                                                        | tree    |
+| <code>position</code>     | explorer widget position, embed or overlay                                               | overlay |</p>
 
                     </main>
 
