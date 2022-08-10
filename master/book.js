@@ -601,10 +601,10 @@ function playground_text(playground) {
     });
 })();
 
-(function controlMenu() {
+(function controllMenu() {
     var menu = document.getElementById('menu-bar');
 
-    (function controlPosition() {
+    (function controllPosition() {
         var scrollTop = document.scrollingElement.scrollTop;
         var prevScrollTop = scrollTop;
         var minMenuY = -menu.clientHeight - 50;
@@ -647,7 +647,7 @@ function playground_text(playground) {
             prevScrollTop = scrollTop;
         }, { passive: true });
     })();
-    (function controlBorder() {
+    (function controllBorder() {
         menu.classList.remove('bordered');
         document.addEventListener('scroll', function () {
             if (menu.offsetTop === 0) {
