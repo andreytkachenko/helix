@@ -5,7 +5,7 @@ use tui::text::Spans;
 
 use std::borrow::Cow;
 
-use helix_core::{Change, Transaction};
+use helix_core::{regex, Change, Selection, Transaction};
 use helix_view::{
     graphics::Rect,
     input::{KeyCode, KeyEvent},
@@ -15,7 +15,10 @@ use helix_view::{
 use crate::commands;
 use crate::ui::{menu, Markdown, Menu, Popup, PromptEvent};
 
-use helix_lsp::{lsp, util};
+use helix_lsp::{
+    lsp::{self, TextEdit},
+    util::{self, lsp_pos_to_pos},
+};
 use lsp::CompletionItem;
 
 impl menu::Item for CompletionItem {
@@ -120,6 +123,20 @@ impl Completion {
                             // TODO: support using "insert" instead of "replace" via user config
                             lsp::TextEdit::new(item.replace, item.new_text.clone())
                         }
+                    };
+
+                    let edit = match item.insert_text_format {
+                        Some(lsp::InsertTextFormat::SNIPPET) => {
+                            let new_text = regex::Regex::new(r"\$\d+|\$\{\d+\}|\$\{\d+:([^}]*)\}")
+                                .unwrap()
+                                .replace_all(&edit.new_text, "$1");
+
+                            TextEdit {
+                                range: edit.range,
+                                new_text: new_text.into_owned(),
+                            }
+                        }
+                        _ => edit,
                     };
 
                     util::generate_transaction_from_completion_edit(
