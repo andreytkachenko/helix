@@ -119,6 +119,57 @@ impl Default for FilePickerConfig {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ExplorerStyle {
+    Tree,
+    List,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ExplorerPosition {
+    Embed,
+    Overlay,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", default, deny_unknown_fields)]
+pub struct ExplorerConfig {
+    pub style: ExplorerStyle,
+    pub position: ExplorerPosition,
+    /// explorer column width
+    pub column_width: usize,
+}
+
+impl ExplorerConfig {
+    pub fn is_embed(&self) -> bool {
+        return self.position == ExplorerPosition::Embed;
+    }
+
+    pub fn is_overlay(&self) -> bool {
+        return self.position == ExplorerPosition::Overlay;
+    }
+
+    pub fn is_list(&self) -> bool {
+        return self.style == ExplorerStyle::List;
+    }
+
+    pub fn is_tree(&self) -> bool {
+        return self.style == ExplorerStyle::Tree;
+    }
+}
+
+impl Default for ExplorerConfig {
+    fn default() -> Self {
+        Self {
+            style: ExplorerStyle::Tree,
+            position: ExplorerPosition::Overlay,
+            column_width: 30,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", default, deny_unknown_fields)]
 pub struct Config {
@@ -182,6 +233,8 @@ pub struct Config {
     pub indent_guides: IndentGuidesConfig,
     /// Whether to color modes with different colors. Defaults to `false`.
     pub color_modes: bool,
+    /// explore config
+    pub explorer: ExplorerConfig,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -634,6 +687,7 @@ impl Default for Config {
             bufferline: BufferLine::default(),
             indent_guides: IndentGuidesConfig::default(),
             color_modes: false,
+            explorer: ExplorerConfig::default(),
         }
     }
 }
