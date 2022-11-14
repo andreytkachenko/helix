@@ -38,6 +38,7 @@ pub struct EditorView {
     pseudo_pending: Vec<KeyEvent>,
     last_insert: (commands::MappableCommand, Vec<InsertEvent>),
     pub(crate) completion: Option<Completion>,
+    pub(crate) terminal: super::terminal::Terminal,
     spinners: ProgressSpinners,
     pub(crate) explorer: Option<Overlay<Explorer>>,
 }
@@ -63,6 +64,7 @@ impl EditorView {
             pseudo_pending: Vec::new(),
             last_insert: (commands::MappableCommand::normal_mode, Vec::new()),
             completion: None,
+            terminal: super::terminal::Terminal::new(),
             spinners: ProgressSpinners::default(),
             explorer: None,
         }
@@ -97,6 +99,7 @@ impl EditorView {
                 None
             }
         });
+
         if let Some(frame) = stack_frame {
             if doc.path().is_some()
                 && frame
@@ -351,7 +354,7 @@ impl EditorView {
         let cursor_scope = match mode {
             Mode::Insert => theme.find_scope_index("ui.cursor.insert"),
             Mode::Select => theme.find_scope_index("ui.cursor.select"),
-            Mode::Normal => Some(base_cursor_scope),
+            _ => Some(base_cursor_scope),
         }
         .unwrap_or(base_cursor_scope);
 
@@ -1298,11 +1301,18 @@ impl Component for EditorView {
         event: &Event,
         context: &mut crate::compositor::Context,
     ) -> EventResult {
+        if context.editor.terminals.visible {
+            if let EventResult::Consumed(cb) = self.terminal.handle_event(event, context) {
+                return EventResult::Consumed(cb);
+            }
+        }
+
         if let Some(explore) = self.explorer.as_mut() {
             if let EventResult::Consumed(callback) = explore.handle_event(event, context) {
                 return EventResult::Consumed(callback);
             }
         }
+
         let mut cx = commands::Context {
             editor: context.editor,
             count: None,
@@ -1465,11 +1475,24 @@ impl Component for EditorView {
             editor_area = editor_area.clip_top(1);
         }
 
+        let original_height = editor_area.height;
+        if cx.editor.terminals.visible {
+            editor_area = editor_area.clip_bottom(editor_area.height / 2);
+        }
+
         if self.explorer.is_some() && (config.explorer.is_embed()) {
             editor_area = editor_area.clip_left(config.explorer.column_width as u16 + 2);
         }
 
+        // if the terminal size suddenly changed, we need to trigger a resize
         cx.editor.resize(editor_area);
+
+        if cx.editor.terminals.visible {
+            let mut term_area = editor_area;
+            term_area.height = original_height - editor_area.height;
+            term_area.y += editor_area.height;
+            self.terminal.render(term_area, surface, cx);
+        }
 
         if use_bufferline {
             Self::render_bufferline(cx.editor, area.with_height(1), surface);

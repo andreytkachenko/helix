@@ -6,6 +6,7 @@ use crate::{
     icons::{self, Icons},
     info::Info,
     input::KeyEvent,
+    terminal::{TerminalEvent, TerminalView},
     theme::{self, Theme},
     tree::{self, Tree},
     Align, Document, DocumentId, View, ViewId,
@@ -777,6 +778,7 @@ pub struct Editor {
     pub idle_timer: Pin<Box<Sleep>>,
     pub last_motion: Option<Motion>,
 
+    pub terminals: TerminalView,
     pub last_completion: Option<CompleteAction>,
 
     pub exit_code: i32,
@@ -796,6 +798,7 @@ pub enum EditorEvent {
     DocumentSaved(DocumentSavedEventResult),
     ConfigEvent(ConfigEvent),
     LanguageServerMessage((usize, Call)),
+    TerminalEvent(TerminalEvent),
     DebuggerEvent(dap::Payload),
     IdleTimer,
 }
@@ -883,6 +886,7 @@ impl Editor {
             idle_timer: Box::pin(sleep(conf.idle_timeout)),
             last_motion: None,
             last_completion: None,
+            terminals: TerminalView::new(),
             config,
             auto_pairs,
             exit_code: 0,
@@ -1459,6 +1463,9 @@ impl Editor {
                 Some(message) = self.language_servers.incoming.next() => {
                     return EditorEvent::LanguageServerMessage(message)
                 }
+                Some(event) = self.terminals.poll_event() => {
+                    return EditorEvent::TerminalEvent(event)
+                }
                 Some(event) = self.debugger_events.next() => {
                     return EditorEvent::DebuggerEvent(event)
                 }
@@ -1473,9 +1480,6 @@ impl Editor {
                     }
                 }
 
-                _ = &mut self.idle_timer  => {
-                    return EditorEvent::IdleTimer
-                }
             }
         }
     }

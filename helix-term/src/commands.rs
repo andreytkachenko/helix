@@ -1,12 +1,14 @@
 pub(crate) mod dap;
 pub(crate) mod lsp;
 pub(crate) mod typed;
+pub(crate) mod vte;
 
 pub use dap::*;
 use helix_vcs::Hunk;
 pub use lsp::*;
 use tui::text::Spans;
 pub use typed::*;
+pub use vte::*;
 
 use helix_core::{
     comment, coords_at_pos, encoding, find_first_non_whitespace_char, find_root, graphemes,
@@ -455,6 +457,8 @@ impl MappableCommand {
         toggle_or_focus_explorer, "toggle or focus explorer",
         open_explorer_recursion, "open explorer recursion",
         close_explorer, "close explorer",
+        toggle_terminal, "Toggle integrated terminal",
+        close_terminal, "Close active terminal",
     );
 }
 

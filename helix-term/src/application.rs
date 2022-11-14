@@ -583,6 +583,14 @@ impl Application {
                     self.last_render = Instant::now();
                 }
             }
+
+            EditorEvent::TerminalEvent(event) => {
+                let needs_render = self.editor.handle_virtual_terminal_events(event).await;
+                if needs_render {
+                    self.render().await;
+                }
+            }
+
             EditorEvent::DebuggerEvent(payload) => {
                 let needs_render = self.editor.handle_debugger_message(payload).await;
                 if needs_render {

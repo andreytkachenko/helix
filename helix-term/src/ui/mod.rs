@@ -12,6 +12,7 @@ pub mod popup;
 mod prompt;
 mod spinner;
 mod statusline;
+mod terminal;
 mod text;
 mod tree;
 

@@ -5,7 +5,7 @@ use tui::text::Spans;
 
 use std::borrow::Cow;
 
-use helix_core::{regex, Change, Selection, Transaction};
+use helix_core::{regex, Change, Transaction};
 use helix_view::{
     graphics::Rect,
     input::{KeyCode, KeyEvent},
@@ -17,7 +17,7 @@ use crate::ui::{menu, Markdown, Menu, Popup, PromptEvent};
 
 use helix_lsp::{
     lsp::{self, TextEdit},
-    util::{self, lsp_pos_to_pos},
+    util::{self},
 };
 use lsp::CompletionItem;
 
