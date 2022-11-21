@@ -703,11 +703,18 @@ impl<T: Item + 'static> Component for Picker<T> {
                 );
             }
 
-            let spans = option.label(&self.editor_data);
+            let icons_enabled = cx.editor.config().file_picker.extended_icons;
+            let icons = if icons_enabled {
+                Some(&cx.editor.icons)
+            } else {
+                None
+            };
+            let spans = option.label(&self.editor_data, icons);
             let (_score, highlights) = FuzzyQuery::new(self.prompt.line())
                 .fuzzy_indicies(&String::from(&spans), &self.matcher)
                 .unwrap_or_default();
 
+            let mut first_span = true;
             spans.0.into_iter().fold(inner, |pos, span| {
                 let new_x = surface
                     .set_string_truncated(
@@ -725,9 +732,15 @@ impl<T: Item + 'static> Component for Picker<T> {
                             }
                         },
                         true,
-                        self.truncate_start,
+                        // Do not truncate the icons
+                        if icons_enabled {
+                            self.truncate_start && (!first_span)
+                        } else {
+                            self.truncate_start
+                        },
                     )
                     .0;
+                first_span = false;
                 pos.clip_left(new_x - pos.x)
             });
         }

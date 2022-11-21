@@ -11,27 +11,45 @@ pub use tui::widgets::{Cell, Row};
 use fuzzy_matcher::skim::SkimMatcherV2 as Matcher;
 use fuzzy_matcher::FuzzyMatcher;
 
-use helix_view::{graphics::Rect, Editor};
+use helix_view::{
+    graphics::Rect,
+    icons::{Icon, Icons},
+    Editor,
+};
 use tui::layout::Constraint;
 
 pub trait Item {
     /// Additional editor state that is used for label calculation.
     type Data;
 
-    fn label(&self, data: &Self::Data) -> Spans;
+    /// If the `icons` parameter is set to `None`, no icon will be present in the label
+    fn label<'a>(&self, data: &Self::Data, icons: Option<&'a Icons>) -> Spans {
+        let icon_span = icons.and_then(|icons| self.icon(icons));
+        let mut spans = self.label_text(data);
+        if let Some(icon_span) = icon_span {
+            spans.0.insert(0, icon_span.into());
+        }
+        spans
+    }
+
+    fn label_text(&self, data: &Self::Data) -> Spans;
 
     fn sort_text(&self, data: &Self::Data) -> Cow<str> {
-        let label: String = self.label(data).into();
+        let label: String = self.label(data, None).into();
         label.into()
     }
 
     fn filter_text(&self, data: &Self::Data) -> Cow<str> {
-        let label: String = self.label(data).into();
+        let label: String = self.label(data, None).into();
         label.into()
     }
 
     fn row(&self, data: &Self::Data) -> Row {
-        Row::new(vec![Cell::from(self.label(data))])
+        Row::new(vec![Cell::from(self.label(data, None))])
+    }
+
+    fn icon<'a>(&self, _icons: &'a Icons) -> Option<&'a Icon> {
+        None
     }
 }
 
@@ -39,11 +57,38 @@ impl Item for PathBuf {
     /// Root prefix to strip.
     type Data = PathBuf;
 
-    fn label(&self, root_path: &Self::Data) -> Spans {
+    fn label_text<'a>(&self, root_path: &Self::Data) -> Spans {
         self.strip_prefix(root_path)
             .unwrap_or(self)
             .to_string_lossy()
             .into()
+    }
+
+    /// Returns the icon for a filetype.
+    /// If not was found, it falls back on the `file` symbolkind icon, if available.
+    fn icon<'a>(&self, icons: &'a Icons) -> Option<&'a Icon> {
+        if let Some(extension_or_filename) = self
+            .extension()
+            .or_else(|| self.file_name())
+            .and_then(|e| e.to_str())
+        {
+            if let Some(mime_type_icons) = &icons.mime_type {
+                match mime_type_icons.get(extension_or_filename) {
+                    Some(i) => Some(i),
+                    None => {
+                        if let Some(symbol_kind_icons) = &icons.symbol_kind {
+                            symbol_kind_icons.get("file")
+                        } else {
+                            None
+                        }
+                    }
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 }
 

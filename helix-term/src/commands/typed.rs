@@ -793,6 +793,33 @@ fn theme(
     Ok(())
 }
 
+fn icons(
+    cx: &mut compositor::Context,
+    args: &[Cow<str>],
+    event: PromptEvent,
+) -> anyhow::Result<()> {
+    let true_color = cx.editor.config.load().true_color || crate::true_color();
+    if let PromptEvent::Validate = event {
+        if let Some(flavor_name) = args.first() {
+            let icons = cx
+                .editor
+                .icons_loader
+                .load(flavor_name, &cx.editor.theme, true_color)
+                .with_context(|| "Icons flavor does not exist")?;
+            // if !(true_color || theme.is_16_color()) {
+            //     bail!("Unsupported theme: theme requires true color support");
+            // }
+            cx.editor.set_icons(icons);
+        } else {
+            let name = cx.editor.icons.name().to_string();
+
+            cx.editor.set_status(name);
+        }
+    };
+
+    Ok(())
+}
+
 fn yank_main_selection_to_clipboard(
     cx: &mut compositor::Context,
     _args: &[Cow<str>],
@@ -2041,6 +2068,13 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
             doc: "Change the editor theme (show current theme if no name specified).",
             fun: theme,
             completer: Some(completers::theme),
+        },
+        TypableCommand {
+            name: "icons",
+            aliases: &[],
+            doc: "Change the editor icon flavor (show current flavor if no name specified).",
+            fun: icons,
+            completer: Some(completers::icons),
         },
         TypableCommand {
             name: "clipboard-yank",

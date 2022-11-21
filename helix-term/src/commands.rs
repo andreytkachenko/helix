@@ -1866,7 +1866,7 @@ fn global_search(cx: &mut Context) {
     impl ui::menu::Item for FileResult {
         type Data = Option<PathBuf>;
 
-        fn label(&self, current_path: &Self::Data) -> Spans {
+        fn label_text<'a>(&self, current_path: &Self::Data) -> Spans {
             let relative_path = helix_core::path::get_relative_path(&self.path)
                 .to_string_lossy()
                 .into_owned();
@@ -2317,7 +2317,7 @@ fn buffer_picker(cx: &mut Context) {
     impl ui::menu::Item for BufferMeta {
         type Data = ();
 
-        fn label(&self, _data: &Self::Data) -> Spans {
+        fn label_text(&self, _data: &Self::Data) -> Spans {
             let path = self
                 .path
                 .as_deref()
@@ -2386,7 +2386,7 @@ fn jumplist_picker(cx: &mut Context) {
     impl ui::menu::Item for JumpMeta {
         type Data = ();
 
-        fn label(&self, _data: &Self::Data) -> Spans {
+        fn label_text(&self, _data: &Self::Data) -> Spans {
             let path = self
                 .path
                 .as_deref()
@@ -2459,7 +2459,7 @@ fn jumplist_picker(cx: &mut Context) {
 impl ui::menu::Item for MappableCommand {
     type Data = ReverseKeymap;
 
-    fn label(&self, keymap: &Self::Data) -> Spans {
+    fn label_text(&self, keymap: &Self::Data) -> Spans {
         let fmt_binding = |bindings: &Vec<Vec<KeyEvent>>| -> String {
             bindings.iter().fold(String::new(), |mut acc, bind| {
                 if !acc.is_empty() {
