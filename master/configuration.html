@@ -175,6 +175,8 @@ hidden = false
 <code>--config</code> command line argument, for example <code>hx -c path/to/custom-config.toml</code>.
 Additionally, you can reload the configuration file by sending the USR1
 signal to the Helix process on Unix operating systems, such as by using the command <code>pkill -USR1 hx</code>.</p>
+<p>Finally, you can have a <code>config.toml</code> local to a project by putting it under a <code>.helix</code> directory in your repository.
+Its settings will be merged with the configuration directory <code>config.toml</code> and the built-in configuration.</p>
 <h2 id="editor"><a class="header" href="#editor">Editor</a></h2>
 <h3 id="editor-section"><a class="header" href="#editor-section"><code>[editor]</code> Section</a></h3>
 <div class="table-wrapper"><table><thead><tr><th>Key</th><th>Description</th><th>Default</th></tr></thead><tbody>
@@ -195,10 +197,12 @@ signal to the Helix process on Unix operating systems, such as by using the comm
 <tr><td><code>completion-replace</code></td><td>Set to <code>true</code> to make completions always replace the entire word and not just the part before the cursor</td><td><code>false</code></td></tr>
 <tr><td><code>auto-info</code></td><td>Whether to display info boxes</td><td><code>true</code></td></tr>
 <tr><td><code>true-color</code></td><td>Set to <code>true</code> to override automatic detection of terminal truecolor support in the event of a false negative</td><td><code>false</code></td></tr>
+<tr><td><code>undercurl</code></td><td>Set to <code>true</code> to override automatic detection of terminal undercurl support in the event of a false negative</td><td><code>false</code></td></tr>
 <tr><td><code>rulers</code></td><td>List of column positions at which to display the rulers. Can be overridden by language specific <code>rulers</code> in <code>languages.toml</code> file</td><td><code>[]</code></td></tr>
 <tr><td><code>bufferline</code></td><td>Renders a line at the top of the editor displaying open buffers. Can be <code>always</code>, <code>never</code> or <code>multiple</code> (only shown if more than one buffer is in use)</td><td><code>never</code></td></tr>
 <tr><td><code>color-modes</code></td><td>Whether to color the mode indicator with different colors depending on the mode itself</td><td><code>false</code></td></tr>
 <tr><td><code>text-width</code></td><td>Maximum line length. Used for the <code>:reflow</code> command and soft-wrapping if <code>soft-wrap.wrap_at_text_width</code> is set</td><td><code>80</code></td></tr>
+<tr><td><code>workspace-lsp-roots</code></td><td>Directories relative to the workspace root that are treated as LSP roots. Should only be set in <code>.helix/config.toml</code></td><td><code>[]</code></td></tr>
 </tbody></table>
 </div>
 <h3 id="editorstatusline-section"><a class="header" href="#editorstatusline-section"><code>[editor.statusline]</code> Section</a></h3>
@@ -245,6 +249,7 @@ mode.select = &quot;SELECT&quot;
 <tr><td><code>position-percentage</code></td><td>The cursor position as a percentage of the total number of lines</td></tr>
 <tr><td><code>separator</code></td><td>The string defined in <code>editor.statusline.separator</code> (defaults to <code>&quot;│&quot;</code>)</td></tr>
 <tr><td><code>spacer</code></td><td>Inserts a space between elements (multiple/contiguous spacers may be specified)</td></tr>
+<tr><td><code>version-control</code></td><td>The current branch name or detached commit hash of the opened workspace</td></tr>
 </tbody></table>
 </div>
 <h3 id="editorlsp-section"><a class="header" href="#editorlsp-section"><code>[editor.lsp]</code> Section</a></h3>
@@ -252,11 +257,15 @@ mode.select = &quot;SELECT&quot;
 <tr><td><code>enable</code></td><td>Enables LSP integration. Setting to false will completely disable language servers regardless of language settings.</td><td><code>true</code></td></tr>
 <tr><td><code>display-messages</code></td><td>Display LSP progress messages below statusline<sup class="footnote-reference"><a href="#1">1</a></sup></td><td><code>false</code></td></tr>
 <tr><td><code>auto-signature-help</code></td><td>Enable automatic popup of signature help (parameter hints)</td><td><code>true</code></td></tr>
+<tr><td><code>display-inlay-hints</code></td><td>Display inlay hints<sup class="footnote-reference"><a href="#2">2</a></sup></td><td><code>false</code></td></tr>
 <tr><td><code>display-signature-help-docs</code></td><td>Display docs under signature help popup</td><td><code>true</code></td></tr>
+<tr><td><code>snippets</code></td><td>Enables snippet completions. Requires a server restart (<code>:lsp-restart</code>) to take effect after <code>:config-reload</code>/<code>:set</code>.</td><td><code>true</code></td></tr>
 </tbody></table>
 </div>
 <div class="footnote-definition" id="1"><sup class="footnote-definition-label">1</sup>
-<p>By default, a progress spinner is shown in the statusline beside the file path.</p>
+<p>By default, a progress spinner is shown in the statusline beside the file path.
+<sup class="footnote-reference"><a href="#2">2</a></sup>: You may also have to activate them in the LSP config for them to appear, not just in Helix.
+Inlay hints in Helix are still being improved on and may be a little bit laggy/janky under some circumstances, please report any bugs you see so we can fix them!</p>
 </div>
 <h3 id="editorcursor-shape-section"><a class="header" href="#editorcursor-shape-section"><code>[editor.cursor-shape]</code> Section</a></h3>
 <p>Defines the shape of cursor in each mode.
@@ -277,7 +286,7 @@ not visible in the Helix file picker and global search.</p>
 <p>All git related options are only enabled in a git repository.</p>
 <div class="table-wrapper"><table><thead><tr><th>Key</th><th>Description</th><th>Default</th></tr></thead><tbody>
 <tr><td><code>hidden</code></td><td>Enables ignoring hidden files</td><td>true</td></tr>
-<tr><td><code>follow-links</code></td><td>Follow symlinks instead of ignoring them</td><td>true</td></tr>
+<tr><td><code>follow-symlinks</code></td><td>Follow symlinks instead of ignoring them</td><td>true</td></tr>
 <tr><td><code>deduplicate-links</code></td><td>Ignore symlinks that point at files already shown in the picker</td><td>true</td></tr>
 <tr><td><code>parents</code></td><td>Enables reading ignore files from parent directories</td><td>true</td></tr>
 <tr><td><code>ignore</code></td><td>Enables reading <code>.ignore</code> files</td><td>true</td></tr>
@@ -390,7 +399,7 @@ layout = [&quot;diff&quot;, &quot;diagnostics&quot;, &quot;line-numbers&quot;, &
 <pre><code class="language-toml">[editor.gutters.line-numbers]
 min-width = 1
 </code></pre>
-<h4 id="editorguttersdiagnotics-section"><a class="header" href="#editorguttersdiagnotics-section"><code>[editor.gutters.diagnotics]</code> Section</a></h4>
+<h4 id="editorguttersdiagnostics-section"><a class="header" href="#editorguttersdiagnostics-section"><code>[editor.gutters.diagnostics]</code> Section</a></h4>
 <p>Currently unused</p>
 <h4 id="editorguttersdiff-section"><a class="header" href="#editorguttersdiff-section"><code>[editor.gutters.diff]</code> Section</a></h4>
 <p>Currently unused</p>
