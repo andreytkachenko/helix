@@ -14,6 +14,7 @@ members = [
   "helix-vcs",
   "helix-parsec",
   "helix-stdx",
+  "helix-agent",
   "xtask",
 ]
 
@@ -58,6 +59,13 @@ globset = "0.4"
 etcetera = "0.11"
 arc-swap = "1.9"
 arrayvec = "0.7"
+async-stream = "0.3"
+async-trait = "0.1"
+crossbeam-queue = "0.3"
+reqwest = { version = "0.13", features = ["json", "stream"] }
+imara-diff = "0.2"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "time", "process", "macros", "fs", "parking_lot", "sync"] }
+serde = { version = "1.0", features = ["derive"] }
 
 [workspace.package]
 version = "25.7.1"

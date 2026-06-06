@@ -1,0 +1,9 @@
+theme = "dark_plus"
+
+[agent]
+model = "unsloth/Qwen3.6-27B MTP"
+provider = "openai"
+base-url = "http://127.0.0.1:8001"
+api-key = "test-key"
+thinking-level = "off"
+system-prompt = "You are a helpful coding assistant integrated into the Helix editor."

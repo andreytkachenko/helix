@@ -157,6 +157,7 @@ where
         helix_view::editor::StatusLineElement::VersionControl => render_version_control,
         helix_view::editor::StatusLineElement::Register => render_register,
         helix_view::editor::StatusLineElement::CurrentWorkingDirectory => render_cwd,
+        helix_view::editor::StatusLineElement::AgentStatus => render_agent_status,
     }
 }
 
@@ -171,6 +172,7 @@ where
         Mode::Insert => &modenames.insert,
         Mode::Select => &modenames.select,
         Mode::Normal => &modenames.normal,
+        Mode::Agent => &modenames.agent,
     };
     let content = if visible {
         format!(" {mode_str} ")
@@ -183,6 +185,7 @@ where
             Mode::Insert => context.editor.theme.get("ui.statusline.insert"),
             Mode::Select => context.editor.theme.get("ui.statusline.select"),
             Mode::Normal => context.editor.theme.get("ui.statusline.normal"),
+            Mode::Agent => context.editor.theme.get("ui.statusline.agent"),
         }
     } else {
         Style::default()
@@ -582,4 +585,30 @@ where
         .to_string_lossy()
         .to_string();
     write(context, cwd.into())
+}
+
+fn render_agent_status<'a, F>(context: &mut RenderContext<'a>, write: F)
+where
+    F: Fn(&mut RenderContext<'a>, Span<'a>) + Copy,
+{
+    use helix_view::editor::AgentStatus;
+    let status = &*context.editor.agent_session.status.read().unwrap();
+
+    // Don't render anything when idle
+    if *status == AgentStatus::Idle {
+        return;
+    }
+
+    let symbol = status.spinner_symbol();
+    let label = status.label();
+    let content = format!(" {} {} ", symbol, label);
+
+    let style = match status {
+        AgentStatus::Thinking => context.editor.theme.get("ui.visual"),
+        AgentStatus::Streaming => context.editor.theme.get("ui.text"),
+        AgentStatus::Working => context.editor.theme.get("ui.selection"),
+        AgentStatus::Idle => Style::default(),
+    };
+
+    write(context, Span::styled(content, style));
 }

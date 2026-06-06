@@ -1,7 +1,7 @@
 use crate::keymap;
 use crate::keymap::{merge_keys, KeyTrie};
 use helix_loader::merge_toml_values;
-use helix_view::{document::Mode, theme};
+use helix_view::{document::Mode, editor::AgentConfig, theme};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -22,6 +22,7 @@ pub struct ConfigRaw {
     pub theme: Option<theme::Config>,
     pub keys: Option<HashMap<Mode, KeyTrie>>,
     pub editor: Option<toml::Value>,
+    pub agent: Option<AgentConfig>,
 }
 
 impl Default for Config {
@@ -84,6 +85,13 @@ impl Config {
                         .map_err(ConfigLoadError::BadConfig)?,
                 };
 
+                // Merge agent config: local takes precedence over global
+                let agent = local.agent.or(global.agent);
+                let mut editor = editor;
+                if let Some(agent_config) = agent {
+                    editor.agent = agent_config;
+                }
+
                 Config {
                     theme: local.theme.or(global.theme),
                     keys,
@@ -100,13 +108,18 @@ impl Config {
                 if let Some(keymap) = config.keys {
                     merge_keys(&mut keys, keymap);
                 }
+                let mut editor = config.editor.map_or_else(
+                    || Ok(helix_view::editor::Config::default()),
+                    |val| val.try_into().map_err(ConfigLoadError::BadConfig),
+                )?;
+                // Apply agent config if present
+                if let Some(agent_config) = config.agent {
+                    editor.agent = agent_config;
+                }
                 Config {
                     theme: config.theme,
                     keys,
-                    editor: config.editor.map_or_else(
-                        || Ok(helix_view::editor::Config::default()),
-                        |val| val.try_into().map_err(ConfigLoadError::BadConfig),
-                    )?,
+                    editor,
                 }
             }
 

@@ -23,6 +23,7 @@ helix-loader = { path = "../helix-loader" }
 helix-lsp = { path = "../helix-lsp" }
 helix-dap = { path = "../helix-dap" }
 helix-vcs = { path = "../helix-vcs" }
+helix-agent = { path = "../helix-agent" }
 
 bitflags.workspace = true
 anyhow = "1"
@@ -51,6 +52,7 @@ log = "~0.4"
 
 parking_lot.workspace = true
 thiserror.workspace = true
+crossbeam-queue.workspace = true
 
 kstring = "2.0"
 

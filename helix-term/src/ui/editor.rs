@@ -20,7 +20,7 @@ use helix_core::{
     syntax::{self, OverlayHighlights},
     text_annotations::TextAnnotations,
     unicode::width::UnicodeWidthStr,
-    visual_offset_from_block, Change, Position, Range, Selection, Transaction,
+    visual_offset_from_block, Change, Position, Range, Selection, Tendril, Transaction,
 };
 use helix_view::{
     annotations::diagnostics::DiagnosticFilter,
@@ -561,6 +561,7 @@ impl EditorView {
             Mode::Insert => theme.find_highlight_exact("ui.cursor.insert"),
             Mode::Select => theme.find_highlight_exact("ui.cursor.select"),
             Mode::Normal => theme.find_highlight_exact("ui.cursor.normal"),
+            Mode::Agent => theme.find_highlight_exact("ui.cursor.agent"),
         }
         .unwrap_or(base_cursor_scope);
 
@@ -568,6 +569,7 @@ impl EditorView {
             Mode::Insert => theme.find_highlight_exact("ui.cursor.primary.insert"),
             Mode::Select => theme.find_highlight_exact("ui.cursor.primary.select"),
             Mode::Normal => theme.find_highlight_exact("ui.cursor.primary.normal"),
+            Mode::Agent => theme.find_highlight_exact("ui.cursor.primary.agent"),
         }
         .unwrap_or(base_primary_cursor_scope);
 
@@ -657,6 +659,82 @@ impl EditorView {
             ranges.extend(tabstop.ranges.iter().map(|range| range.start..range.end));
         }
         Some(OverlayHighlights::Homogeneous { highlight, ranges })
+    }
+
+    /// Apply pending document updates from agent tool execution.
+    /// Reloads open documents whose files were modified by tools (edit, write, bash).
+    fn apply_document_updates(cx: &mut Context) {
+        let updates = std::mem::take(&mut *cx.editor.agent_session.document_updates.write().unwrap());
+        if updates.is_empty() {
+            return;
+        }
+
+        let view_id = view!(cx.editor).id;
+
+        // First pass: find matching document IDs for each update (use index as key)
+        let matches: Vec<(usize, helix_view::DocumentId)> = updates
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, update)| {
+                for (doc_id, doc) in cx.editor.documents.iter() {
+                    let doc_path = match doc.path() {
+                        Some(p) => p,
+                        None => continue,
+                    };
+
+                    // Try direct match
+                    if doc_path == &update.path {
+                        return Some((idx, *doc_id));
+                    }
+
+                    // Try canonicalized match
+                    if let (Ok(canonical_doc), Ok(canonical_update)) = (
+                        std::fs::canonicalize(doc_path),
+                        std::fs::canonicalize(&update.path),
+                    ) {
+                        if canonical_doc == canonical_update {
+                            return Some((idx, *doc_id));
+                        }
+                    }
+
+                    // Try filename match as last resort
+                    if doc_path.file_name() == update.path.file_name() {
+                        return Some((idx, *doc_id));
+                    }
+                }
+                None
+            })
+            .collect();
+
+        // Second pass: apply updates to matched documents
+        for (update_idx, doc_id) in matches {
+            let update = match updates.get(update_idx) {
+                Some(u) => u,
+                None => continue,
+            };
+
+            // Apply the update as a transaction to preserve undo history
+            let doc = match cx.editor.documents.get_mut(&doc_id) {
+                Some(d) => d,
+                None => continue,
+            };
+
+            let rope = doc.text();
+            let text = rope.slice(..);
+            let old_content = text.to_string();
+
+            if old_content != update.content {
+                let new_content: Tendril = update.content.clone().into();
+                let transaction = Transaction::change(
+                    rope,
+                    std::iter::once((0, old_content.len(), Some(new_content))),
+                )
+                .with_selection(Selection::point(0));
+
+                doc.apply(&transaction, view_id);
+                doc.reset_modified();
+            }
+        }
     }
 
     /// Render bufferline at the top
@@ -1601,6 +1679,9 @@ impl Component for EditorView {
     }
 
     fn render(&mut self, area: Rect, surface: &mut Surface, cx: &mut Context) {
+        // Apply pending document updates from agent tool execution
+        Self::apply_document_updates(cx);
+
         // clear with background color
         surface.set_style(area, cx.editor.theme.get("ui.background"));
         let config = cx.editor.config();

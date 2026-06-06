@@ -60,6 +60,7 @@ pub fn default() -> HashMap<Mode, KeyTrie> {
             "j" => move_line_down,
             "." => goto_last_modification,
             "w" => goto_word,
+            "A" => agent_toggle,
         },
         ":" => command_mode,
 
@@ -94,6 +95,9 @@ pub fn default() -> HashMap<Mode, KeyTrie> {
         "A-e" => move_parent_node_end,
         "A-b" => move_parent_node_start,
         "A-a" => select_all_siblings,
+
+        // Agent toggle
+        "A-space" => agent_toggle,
 
         "%" => select_all,
         "x" => extend_line_below,
@@ -404,9 +408,47 @@ pub fn default() -> HashMap<Mode, KeyTrie> {
         "home" => goto_line_start,
         "end" => goto_line_end_newline,
     });
+    
+    // Agent mode: inherits normal mode navigation, with agent-specific commands
+    let agent = keymap!({ "Agent mode"
+        // Navigation (same as normal mode)
+        "h" | "left" => move_char_left,
+        "j" | "down" => move_visual_line_down,
+        "k" | "up" => move_visual_line_up,
+        "l" | "right" => move_char_right,
+
+        // Agent-specific commands
+        "esc" => agent_hide,        // Hide panel, agent continues in background
+        "C-c" => agent_stop,        // Stop agent execution
+        "C-q" => agent_close,       // Close panel AND stop agent
+        "ret" => agent_submit,
+        "S-ret" | "C-ret" | "C-j" => agent_insert_newline,  // Multiline input
+        ":" => command_mode,
+
+        // Allow normal mode navigation
+        "0" => goto_line_start,
+        "$" => goto_line_end,
+        "w" => move_next_word_start,
+        "b" => move_prev_word_start,
+        "e" => move_next_word_end,
+        "g" => { "Goto"
+            "g" => goto_file_start,
+        },
+        "G" => goto_line,
+
+        // Enable insert mode for prompt editing
+        "i" => agent_insert_mode,
+        "a" => agent_append_mode,
+        "A" => agent_insert_at_line_end,
+        "I" => agent_insert_at_line_start,
+        // Buffer navigation
+        "n" => goto_next_buffer,
+        "p" => goto_previous_buffer,
+    });
     hashmap!(
         Mode::Normal => normal,
         Mode::Select => select,
         Mode::Insert => insert,
+        Mode::Agent => agent,
     )
 }

@@ -49,6 +49,7 @@ helix-lsp = { path = "../helix-lsp" }
 helix-dap = { path = "../helix-dap" }
 helix-vcs = { path = "../helix-vcs" }
 helix-loader = { path = "../helix-loader" }
+helix-agent = { path = "../helix-agent" }
 
 anyhow = "1"
 once_cell = "1.21"
@@ -93,6 +94,7 @@ serde = { version = "1.0", features = ["derive"] }
 dashmap = "6.2"
 
 parking_lot.workspace = true
+crossbeam-queue.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 crossterm = { version = "0.28", features = ["event-stream"] }

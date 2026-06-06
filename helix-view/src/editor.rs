@@ -434,6 +434,211 @@ pub struct Config {
     pub buffer_picker: BufferPickerConfig,
     /// Whether to implicitly trust every workspace or not
     pub insecure: bool,
+    /// Agent configuration
+    pub agent: AgentConfig,
+}
+
+// ─── Agent configuration ─────────────────────────────────────────────────────
+
+/// Agent status for the status bar indicator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentStatus {
+    Idle,
+    Thinking,
+    Streaming,
+    Working,
+}
+
+impl AgentStatus {
+    pub fn spinner_symbol(&self) -> &'static str {
+        match self {
+            AgentStatus::Idle => "○",
+            AgentStatus::Thinking => "◐",
+            AgentStatus::Streaming => "◑",
+            AgentStatus::Working => "●",
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            AgentStatus::Idle => "",
+            AgentStatus::Thinking => "thinking",
+            AgentStatus::Streaming => "streaming",
+            AgentStatus::Working => "working",
+        }
+    }
+}
+
+/// Configuration for the agent tools.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
+pub struct AgentToolsConfig {
+    /// Default working directory for tool execution.
+    pub cwd: Option<std::path::PathBuf>,
+    /// Maximum lines for read tool.
+    pub read_max_lines: u64,
+    /// Maximum lines for ls tool.
+    pub ls_max_lines: u64,
+    /// Maximum lines for find tool.
+    pub find_max_lines: u64,
+    /// Maximum lines for grep tool.
+    pub grep_max_lines: u64,
+}
+
+impl Default for AgentToolsConfig {
+    fn default() -> Self {
+        Self {
+            cwd: None,
+            read_max_lines: 2000,
+            ls_max_lines: 500,
+            find_max_lines: 1000,
+            grep_max_lines: 1000,
+        }
+    }
+}
+
+/// Agent configuration from config.toml.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
+pub struct AgentConfig {
+    /// Model identifier to use.
+    pub model: Option<String>,
+    /// Provider name (e.g., "openai", "anthropic").
+    pub provider: Option<String>,
+    /// Base URL for the provider API.
+    pub base_url: Option<String>,
+    /// API key (can also be set via environment variable).
+    pub api_key: Option<String>,
+    /// Thinking/reasoning level.
+    pub thinking_level: helix_agent::agent::ThinkingLevel,
+    /// System prompt for the agent.
+    pub system_prompt: Option<String>,
+    /// Tool configuration.
+    pub tools: AgentToolsConfig,
+}
+
+impl Default for AgentConfig {
+    fn default() -> Self {
+        Self {
+            model: None,
+            provider: None,
+            base_url: None,
+            api_key: None,
+            thinking_level: helix_agent::agent::ThinkingLevel::Off,
+            system_prompt: None,
+            tools: AgentToolsConfig::default(),
+        }
+    }
+}
+
+/// Session state for an active agent conversation.
+pub struct AgentSession {
+    /// Conversation messages (Arc for thread-safe updates from agent process).
+    pub messages: std::sync::Arc<std::sync::RwLock<Vec<helix_agent::message::Message>>>,
+    /// Current assistant text being streamed (Arc for thread-safe updates from agent process).
+    pub assistant_text: std::sync::Arc<std::sync::RwLock<Option<String>>>,
+    /// Current assistant thinking content (Arc for thread-safe updates from agent process).
+    pub assistant_thinking: std::sync::Arc<std::sync::RwLock<Option<String>>>,
+    /// Currently active tool calls (Arc for thread-safe updates from agent process).
+    pub active_tools: std::sync::Arc<std::sync::RwLock<Vec<ActiveTool>>>,
+    /// Current agent status (Arc for thread-safe updates from agent process).
+    pub status: std::sync::Arc<std::sync::RwLock<AgentStatus>>,
+    /// The agent process handle.
+    pub process: Option<helix_agent::agent::AgentProcess>,
+    /// Queue for steering messages during agent execution.
+    pub steering_queue: std::sync::Arc<crossbeam_queue::SegQueue<helix_agent::message::Content>>,
+    /// Whether a stop has been requested.
+    pub stop_requested: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// Scroll offset for the agent output.
+    pub scroll_offset: usize,
+    /// Initialized provider (lazy-initialized on first use).
+    pub provider: Option<std::sync::Arc<dyn helix_agent::providers::Provider + 'static>>,
+    /// Initialized tools registry.
+    pub tools: Option<std::sync::Arc<dyn helix_agent::tools::ToolRegistry + 'static>>,
+    /// Initialized model.
+    pub model: Option<std::sync::Arc<helix_agent::model::Model>>,
+    /// The agent instance.
+    pub agent: Option<std::sync::Arc<helix_agent::agent::Agent>>,
+    /// Current prompt input text (shared with AgentPanel).
+    pub prompt_input: std::sync::Arc<std::sync::RwLock<String>>,
+    /// Whether the prompt should be cleared (set after submit, cleared after prompt acknowledges).
+    pub prompt_clear_requested: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// Agent configuration (for initializing the agent).
+    pub agent_config: Option<AgentConfig>,
+    /// Agent tools configuration (for initializing tools).
+    pub agent_tools_config: Option<AgentToolsConfig>,
+    /// Pending document updates from tool execution (Arc for thread-safe updates).
+    pub document_updates: std::sync::Arc<std::sync::RwLock<Vec<DocumentUpdate>>>,
+    /// Whether the agent panel is currently visible on the compositor.
+    pub panel_visible: bool,
+}
+
+/// An active tool call in progress.
+#[derive(Debug, Clone)]
+pub struct ActiveTool {
+    pub id: String,
+    pub name: String,
+    pub args: serde_json::Value,
+}
+
+/// Pending document update from agent tool execution.
+/// Applied to open documents during compositor render.
+#[derive(Debug, Clone)]
+pub struct DocumentUpdate {
+    /// File path of the document to update.
+    pub path: std::path::PathBuf,
+    /// New content for the document.
+    pub content: String,
+}
+
+
+
+impl std::fmt::Debug for AgentSession {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AgentSession")
+            .field("messages", &self.messages.read().unwrap())
+            .field("assistant_text", &self.assistant_text.read().unwrap())
+            .field("assistant_thinking", &self.assistant_thinking.read().unwrap())
+            .field("active_tools", &self.active_tools.read().unwrap())
+            .field("status", &self.status.read().unwrap())
+            .field("process", &self.process)
+            .field("scroll_offset", &self.scroll_offset)
+            .field("prompt_input", &self.prompt_input.read().unwrap())
+            .field("provider", &"<Provider>")
+            .field("tools", &"<ToolRegistry>")
+            .field("model", &self.model)
+            .field("agent", &"<Agent>")
+            .field("document_updates", &self.document_updates.read().unwrap())
+            .field("panel_visible", &self.panel_visible)
+            .finish()
+    }
+}
+
+impl Default for AgentSession {
+    fn default() -> Self {
+        Self {
+            messages: std::sync::Arc::new(std::sync::RwLock::new(Vec::new())),
+            assistant_text: std::sync::Arc::new(std::sync::RwLock::new(None)),
+            assistant_thinking: std::sync::Arc::new(std::sync::RwLock::new(None)),
+            active_tools: std::sync::Arc::new(std::sync::RwLock::new(Vec::new())),
+            status: std::sync::Arc::new(std::sync::RwLock::new(AgentStatus::Idle)),
+            process: None,
+            steering_queue: std::sync::Arc::new(crossbeam_queue::SegQueue::new()),
+            stop_requested: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            scroll_offset: 0,
+            provider: None,
+            tools: None,
+            model: None,
+            agent: None,
+            prompt_input: std::sync::Arc::new(std::sync::RwLock::new(String::new())),
+            prompt_clear_requested: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            agent_config: None,
+            agent_tools_config: None,
+            document_updates: std::sync::Arc::new(std::sync::RwLock::new(Vec::new())),
+            panel_visible: false,
+        }
+    }
 }
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize, Clone, Copy)]
@@ -614,6 +819,7 @@ impl Default for StatusLineConfig {
         Self {
             left: vec![
                 E::Mode,
+                E::AgentStatus,
                 E::Spinner,
                 E::FileName,
                 E::ReadOnlyIndicator,
@@ -641,6 +847,7 @@ pub struct ModeConfig {
     pub normal: String,
     pub insert: String,
     pub select: String,
+    pub agent: String,
 }
 
 impl Default for ModeConfig {
@@ -649,6 +856,7 @@ impl Default for ModeConfig {
             normal: String::from("NOR"),
             insert: String::from("INS"),
             select: String::from("SEL"),
+            agent: String::from("AGE"),
         }
     }
 }
@@ -724,12 +932,15 @@ pub enum StatusLineElement {
 
     /// The base of current working directory
     CurrentWorkingDirectory,
+
+    /// The agent work-in-progress status indicator
+    AgentStatus,
 }
 
 // Cursor shape is read and used on every rendered frame and so needs
 // to be fast. Therefore we avoid a hashmap and use an enum indexed array.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CursorShapeConfig([CursorKind; 3]);
+pub struct CursorShapeConfig([CursorKind; 4]);
 
 impl CursorShapeConfig {
     pub fn from_mode(&self, mode: Mode) -> CursorKind {
@@ -748,6 +959,7 @@ impl<'de> Deserialize<'de> for CursorShapeConfig {
             into_cursor(Mode::Normal),
             into_cursor(Mode::Select),
             into_cursor(Mode::Insert),
+            into_cursor(Mode::Agent),
         ]))
     }
 }
@@ -758,7 +970,7 @@ impl Serialize for CursorShapeConfig {
         S: serde::Serializer,
     {
         let mut map = serializer.serialize_map(Some(self.len()))?;
-        let modes = [Mode::Normal, Mode::Select, Mode::Insert];
+        let modes = [Mode::Normal, Mode::Select, Mode::Insert, Mode::Agent];
         for mode in modes {
             map.serialize_entry(&mode, &self.from_mode(mode))?;
         }
@@ -767,7 +979,7 @@ impl Serialize for CursorShapeConfig {
 }
 
 impl std::ops::Deref for CursorShapeConfig {
-    type Target = [CursorKind; 3];
+    type Target = [CursorKind; 4];
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -776,7 +988,7 @@ impl std::ops::Deref for CursorShapeConfig {
 
 impl Default for CursorShapeConfig {
     fn default() -> Self {
-        Self([CursorKind::Block; 3])
+        Self([CursorKind::Block; 4])
     }
 }
 
@@ -1157,6 +1369,7 @@ impl Default for Config {
             kitty_keyboard_protocol: Default::default(),
             buffer_picker: BufferPickerConfig::default(),
             insecure: false,
+            agent: AgentConfig::default(),
         }
     }
 }
@@ -1190,6 +1403,8 @@ type Diagnostics = BTreeMap<Uri, Vec<(lsp::Diagnostic, DiagnosticProvider)>>;
 pub struct Editor {
     /// Current editing mode.
     pub mode: Mode,
+    /// Stack of previous modes for proper back-navigation (e.g., NOR → AGE → INS → Escape → AGE).
+    pub mode_stack: Vec<Mode>,
     pub tree: Tree,
     pub next_document_id: DocumentId,
     pub documents: BTreeMap<DocumentId, Document>,
@@ -1259,6 +1474,8 @@ pub struct Editor {
 
     pub mouse_down_range: Option<Range>,
     pub cursor_cache: CursorCache,
+    /// Agent session state.
+    pub agent_session: AgentSession,
 }
 
 pub type Motion = Box<dyn Fn(&mut Editor)>;
@@ -1382,6 +1599,8 @@ impl Editor {
             mouse_down_range: None,
             cursor_cache: CursorCache::default(),
             dir_stack: VecDeque::with_capacity(DIR_STACK_CAP),
+            mode_stack: Vec::new(),
+            agent_session: AgentSession::default(),
         }
     }
 
@@ -2435,7 +2654,7 @@ impl Editor {
         Ok(())
     }
 
-    /// Switches the editor into normal mode.
+    /// Switches the editor into normal mode, pushing the current mode onto the stack.
     pub fn enter_normal_mode(&mut self) {
         use helix_core::graphemes;
 
@@ -2443,6 +2662,10 @@ impl Editor {
             return;
         }
 
+        self.mode_stack.push(self.mode);
+        if self.mode_stack.len() > Self::MODE_STACK_MAX {
+            self.mode_stack.drain(..self.mode_stack.len() - Self::MODE_STACK_MAX);
+        }
         self.mode = Mode::Normal;
         let (view, doc) = current!(self);
 
@@ -2463,6 +2686,42 @@ impl Editor {
             doc.set_selection(view.id, selection);
             doc.restore_cursor = false;
         }
+    }
+
+    /// Maximum depth for the mode stack to prevent unbounded growth.
+    const MODE_STACK_MAX: usize = 10;
+
+    /// Push the current mode onto the stack and switch to `mode`.
+    pub fn enter_mode(&mut self, mode: Mode) {
+        if self.mode != mode {
+            self.mode_stack.push(self.mode);
+            if self.mode_stack.len() > Self::MODE_STACK_MAX {
+                self.mode_stack.drain(..self.mode_stack.len() - Self::MODE_STACK_MAX);
+            }
+            self.mode = mode;
+        }
+    }
+
+    /// Pop from the mode stack and return to the previous mode,
+    /// falling back to Normal if the stack is empty.
+    pub fn exit_mode(&mut self) {
+        self.mode = self.mode_stack.pop().unwrap_or(Mode::Normal);
+    }
+
+    /// Enter insert mode, pushing the current mode onto the stack.
+    pub fn enter_insert_mode(&mut self) {
+        if self.mode != Mode::Insert {
+            self.mode_stack.push(self.mode);
+            if self.mode_stack.len() > Self::MODE_STACK_MAX {
+                self.mode_stack.drain(..self.mode_stack.len() - Self::MODE_STACK_MAX);
+            }
+            self.mode = Mode::Insert;
+        }
+    }
+
+    /// Exit the current mode by popping from the stack, falling back to Normal.
+    pub fn exit_select_mode(&mut self) {
+        self.exit_mode();
     }
 
     pub fn current_stack_frame(&self) -> Option<&dap::StackFrame> {

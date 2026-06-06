@@ -66,6 +66,7 @@ pub enum Mode {
     Normal = 0,
     Select = 1,
     Insert = 2,
+    Agent = 3,
 }
 
 impl Display for Mode {
@@ -74,6 +75,7 @@ impl Display for Mode {
             Mode::Normal => f.write_str("normal"),
             Mode::Select => f.write_str("select"),
             Mode::Insert => f.write_str("insert"),
+            Mode::Agent => f.write_str("agent"),
         }
     }
 }
@@ -86,6 +88,7 @@ impl FromStr for Mode {
             "normal" => Ok(Mode::Normal),
             "select" => Ok(Mode::Select),
             "insert" => Ok(Mode::Insert),
+            "agent" => Ok(Mode::Agent),
             _ => bail!("Invalid mode '{}'", s),
         }
     }

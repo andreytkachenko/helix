@@ -1,3 +1,5 @@
+pub mod agent_output;
+pub mod agent_panel;
 mod completion;
 mod document;
 pub(crate) mod editor;

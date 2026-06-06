@@ -1,8 +1,10 @@
+pub(crate) mod agent;
 pub(crate) mod dap;
 pub(crate) mod lsp;
 pub(crate) mod syntax;
 pub(crate) mod typed;
 
+pub use agent::*;
 pub use dap::*;
 use futures_util::FutureExt;
 use helix_event::status;
@@ -616,6 +618,20 @@ impl MappableCommand {
         goto_prev_tabstop, "Goto next snippet placeholder",
         rotate_selections_first, "Make the first selection your primary one",
         rotate_selections_last, "Make the last selection your primary one",
+
+        // Agent commands
+        agent_toggle, "Toggle the agent panel",
+        agent_hide, "Hide the agent panel (agent continues running)",
+        agent_show, "Show the agent panel",
+        agent_close, "Close the agent panel and stop the agent",
+        agent_submit, "Submit the agent prompt",
+        agent_insert_newline, "Insert newline in agent prompt",
+        agent_insert_mode, "Enter insert mode from agent mode",
+        agent_append_mode, "Append mode from agent mode",
+        agent_insert_at_line_end, "Insert at line end from agent mode",
+        agent_insert_at_line_start, "Insert at line start from agent mode",
+        agent_stop, "Stop the current agent execution",
+        agent_clear, "Clear the agent conversation",
     );
 }
 
@@ -4987,7 +5003,7 @@ pub(crate) fn paste_bracketed_value(cx: &mut Context, contents: String) {
     let count = cx.count();
     let paste = match cx.editor.mode {
         Mode::Insert | Mode::Select => Paste::Cursor,
-        Mode::Normal => Paste::Before,
+        Mode::Normal | Mode::Agent => Paste::Before,
     };
     let (view, doc) = current!(cx.editor);
     paste_impl(&[contents], doc, view, paste, count, cx.editor.mode);

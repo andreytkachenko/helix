@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate helix_view;
 
+pub mod agent_context;
 pub mod application;
 pub mod args;
 pub mod commands;

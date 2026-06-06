@@ -112,3 +112,13 @@ honey = "#efba5d"
 apricot = "#f47868"
 lightning = "#ffcd1c"
 delta = "#6F44F0"
+
+# Agent UI theme keys
+"ui.agent.user" = { fg = "blue", modifiers = ["bold"] }
+"ui.agent.assistant" = "ui.text"
+"ui.agent.thinking" = { fg = "gray", modifiers = ["italic"] }
+"ui.agent.tool" = { fg = "cyan", modifiers = ["bold"] }
+"ui.agent.tool_running" = { fg = "yellow", modifiers = ["italic"] }
+"ui.agent.system" = { fg = "magenta", modifiers = ["italic"] }
+"ui.agent.border" = "ui.popup.border"
+"ui.statusline.agent" = "ui.statusline.normal"
