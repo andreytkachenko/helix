@@ -378,6 +378,8 @@ impl Prompt {
         self.recalculate_completion(editor);
     }
 
+
+
     pub fn move_cursor(&mut self, movement: Movement) {
         let pos = self.eval_movement(movement);
         self.cursor = pos
@@ -448,6 +450,18 @@ impl Prompt {
         register: char,
         direction: CompletionDirection,
     ) {
+        // Save current text to history if it differs from the latest history entry
+        if !self.line.is_empty() {
+            let last_item = self.first_history_completion(cx.editor).map(|entry| entry.to_string());
+            if last_item.as_deref() != Some(&self.line) {
+                if let Err(err) = cx.editor.registers.push(register, self.line.clone()) {
+                    cx.editor.set_error(err.to_string());
+                }
+                // After saving, we're at position 0 (latest entry)
+                self.history_pos = Some(0);
+            }
+        }
+
         (self.callback_fn)(cx, &self.line, PromptEvent::Abort);
         let mut values = match cx.editor.registers.read(register, cx.editor) {
             Some(values) if values.len() > 0 => values.rev(),
@@ -1019,6 +1033,22 @@ impl Component for Prompt {
                     let input = if self.line.is_empty() {
                         ""
                     } else {
+                        // Save to history before submitting
+                        let last_item = self
+                            .first_history_completion(cx.editor)
+                            .map(|entry| entry.to_string())
+                            .unwrap_or_else(|| String::from(""));
+                        if last_item != self.line {
+                            if let Some(register) = self.history_register {
+                                if let Err(err) =
+                                    cx.editor.registers.push(register, self.line.clone())
+                                {
+                                    cx.editor.set_error(err.to_string());
+                                }
+                            };
+                        }
+                        // Reset history position after submit
+                        self.history_pos = None;
                         &self.line
                     };
                     (self.callback_fn)(cx, input, PromptEvent::Validate);
@@ -1054,16 +1084,35 @@ impl Component for Prompt {
             }
             ctrl!('p') | key!(Up) => {
                 if self.multiline {
-                    self.move_cursor(Movement::Up);
-                    (self.callback_fn)(cx, &self.line, PromptEvent::Update);
+                    // At start of text → navigate history backward
+                    if self.cursor == 0 && self.line.is_empty() {
+                        if let Some(register) = self.history_register {
+                            self.change_history(cx, register, CompletionDirection::Backward);
+                        }
+                    } else if self.cursor == 0 {
+                        // Cursor at byte 0 → navigate history backward
+                        if let Some(register) = self.history_register {
+                            self.change_history(cx, register, CompletionDirection::Backward);
+                        }
+                    } else {
+                        self.move_cursor(Movement::Up);
+                        (self.callback_fn)(cx, &self.line, PromptEvent::Update);
+                    }
                 } else if let Some(register) = self.history_register {
                     self.change_history(cx, register, CompletionDirection::Backward);
                 }
             }
             ctrl!('n') | key!(Down) => {
                 if self.multiline {
-                    self.move_cursor(Movement::Down);
-                    (self.callback_fn)(cx, &self.line, PromptEvent::Update);
+                    // At end of text → navigate history forward
+                    if self.cursor >= self.line.len() {
+                        if let Some(register) = self.history_register {
+                            self.change_history(cx, register, CompletionDirection::Forward);
+                        }
+                    } else {
+                        self.move_cursor(Movement::Down);
+                        (self.callback_fn)(cx, &self.line, PromptEvent::Update);
+                    }
                 } else if let Some(register) = self.history_register {
                     self.change_history(cx, register, CompletionDirection::Forward);
                 }

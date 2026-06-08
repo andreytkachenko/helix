@@ -96,8 +96,9 @@ pub fn default() -> HashMap<Mode, KeyTrie> {
         "A-b" => move_parent_node_start,
         "A-a" => select_all_siblings,
 
-        // Agent toggle
+        // Agent panel
         "A-space" => agent_toggle,
+        "C-g" => agent_ask_at_cursor,  // Capture cursor/selection context
 
         "%" => select_all,
         "x" => extend_line_below,

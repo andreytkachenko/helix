@@ -733,6 +733,13 @@ impl EditorView {
 
                 doc.apply(&transaction, view_id);
                 doc.reset_modified();
+
+                // Autosave: write to disk if enabled
+                let path = doc.path().map(|p| p.to_path_buf());
+                if let (Some(path), true) = (path, cx.editor.config().agent.autosave) {
+                    let content = update.content.clone();
+                    let _ = std::fs::write(&path, content);
+                }
             }
         }
     }

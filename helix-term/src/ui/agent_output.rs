@@ -1,6 +1,5 @@
 use crate::compositor::{Component, Context, Event, EventResult};
 use helix_view::{
-    editor::AgentStatus,
     graphics::Rect,
     input::{MouseEvent, MouseEventKind},
     keyboard::{KeyCode, KeyModifiers},
@@ -130,20 +129,23 @@ impl AgentOutput {
         // ── Streaming text (live) ──────────────────────────────────────────
         if let Some(ref text) = *session.assistant_text.read().unwrap() {
             if !text.is_empty() {
+                let assistant_style = theme.get("ui.agent.assistant");
                 let cursor = Span::styled("▌", theme.get("ui.visual"));
-                for line in text.lines() {
-                    let is_last = line == text.lines().last().unwrap_or("");
+                let text_lines: Vec<&str> = text.lines().collect();
+                let total = text_lines.len();
+                for (i, line) in text_lines.iter().enumerate() {
+                    let is_last = i == total - 1 && !text.ends_with('\n');
                     if line.is_empty() {
                         lines.push(Spans::from(Span::raw("")));
-                    } else if is_last && !text.ends_with('\n') {
+                    } else if is_last {
                         lines.push(Spans::from(vec![
-                            Span::styled(line.to_string(), theme.get("ui.agent.assistant")),
+                            Span::styled(line.to_string(), assistant_style),
                             cursor.clone(),
                         ]));
                     } else {
                         lines.push(Spans::from(Span::styled(
                             line.to_string(),
-                            theme.get("ui.agent.assistant"),
+                            assistant_style,
                         )));
                     }
                 }
@@ -153,20 +155,25 @@ impl AgentOutput {
         // ── Streaming thinking (live) ──────────────────────────────────────
         if let Some(ref thinking) = *session.assistant_thinking.read().unwrap() {
             if !thinking.is_empty() {
-                let last_line = thinking.lines().last().unwrap_or("");
-                let display = if last_line.len() > 70 {
-                    format!("… {}", &last_line[..67])
-                } else {
-                    format!("… {}", last_line)
-                };
+                let thinking_style = theme.get("ui.agent.thinking");
                 let cursor = Span::styled("▌", theme.get("ui.visual"));
-                if !thinking.ends_with('\n') {
-                    lines.push(Spans::from(vec![
-                        Span::styled(display, theme.get("ui.agent.thinking")),
-                        cursor.clone(),
-                    ]));
-                } else {
-                    lines.push(Spans::from(Span::styled(display, theme.get("ui.agent.thinking"))));
+                let thinking_lines: Vec<&str> = thinking.lines().collect();
+                let total = thinking_lines.len();
+                for (i, line) in thinking_lines.iter().enumerate() {
+                    let is_last = i == total - 1 && !thinking.ends_with('\n');
+                    let display = if i == 0 {
+                        format!("… {}", line)
+                    } else {
+                        line.to_string()
+                    };
+                    if is_last {
+                        lines.push(Spans::from(vec![
+                            Span::styled(display, thinking_style),
+                            cursor.clone(),
+                        ]));
+                    } else {
+                        lines.push(Spans::from(Span::styled(display, thinking_style)));
+                    }
                 }
             }
         }
@@ -298,7 +305,7 @@ impl Component for AgentOutput {
                         EventResult::Consumed(None)
                     }
                     KeyCode::PageUp => {
-                        *scroll = scroll.saturating_add(10);
+                        *scroll = scroll.saturating_add(10).min(99999);
                         *at_bottom = false;
                         EventResult::Consumed(None)
                     }
@@ -310,11 +317,13 @@ impl Component for AgentOutput {
                         EventResult::Consumed(None)
                     }
                     KeyCode::Char('g') if key_event.modifiers == KeyModifiers::NONE => {
-                        *scroll = 0;
+                        // Jump to top (max scroll = show first lines)
+                        *scroll = usize::MAX;
                         *at_bottom = false;
                         EventResult::Consumed(None)
                     }
                     KeyCode::Char('G') => {
+                        // Jump to bottom (scroll = 0, auto-scroll)
                         *scroll = 0;
                         *at_bottom = true;
                         EventResult::Consumed(None)
@@ -353,17 +362,7 @@ impl Component for AgentOutput {
     }
 
     fn render(&mut self, area: Rect, frame: &mut Surface, ctx: &mut Context) {
-        let status = *ctx.editor.agent_session.status.read().unwrap();
         let theme = &ctx.editor.theme;
-
-        // Auto-scroll when agent is active
-        if status != AgentStatus::Idle {
-            self.at_bottom = true;
-        }
-
-        if self.at_bottom {
-            self.scroll = usize::MAX;
-        }
 
         // Clear the entire output area with background
         frame.clear_with(area, theme.get("ui.popup"));
@@ -372,11 +371,18 @@ impl Component for AgentOutput {
 
         let visible_lines = area.height as usize;
         let total_lines = text.lines.len();
+
+        // Compute effective scroll: at_bottom = scroll to bottom, otherwise use stored offset
+        // Max valid scroll = total_lines - visible_lines (shows first lines at top)
         let max_scroll = total_lines.saturating_sub(visible_lines);
-        let scroll = self.scroll.min(max_scroll);
+        let scroll = if self.at_bottom {
+            max_scroll
+        } else {
+            self.scroll.min(max_scroll)
+        };
 
         let paragraph = Paragraph::new(&text)
-            .scroll(((scroll as u16).saturating_sub(1), 0))
+            .scroll((scroll as u16, 0))
             .alignment(Alignment::Left)
             .wrap(Wrap { trim: false });
 

@@ -24,15 +24,16 @@ pub struct AgentPanel {
 
 impl AgentPanel {
     pub fn new() -> Self {
-        // Create a Prompt with multiline support and statusline background
-        // to match the command input appearance.
+        // Create a Prompt with multiline support, history, and statusline background.
+        // Register 'a' is used for agent prompt history.
         let prompt = Prompt::new(
             "> ".into(),
-            None, // no history register for agent
+            Some('a'), // agent prompt history register
             |_editor, _line| Vec::new(), // no completions
             |_cx, _line, _event| {},     // no-op callback (we handle submit ourselves)
         )
-        .with_multiline(MAX_PROMPT_ROWS);
+        .with_multiline(MAX_PROMPT_ROWS)
+        .with_background("ui.statusline");
 
         Self {
             output: AgentOutput::new(),
@@ -77,27 +78,16 @@ impl Component for AgentPanel {
                     return EventResult::Ignored(None);
                 }
 
-                // PgUp/PgDn/Ctrl+Y/Ctrl+E scroll the output area (not the prompt)
+                // PgUp/PgDn/Ctrl+Y/Ctrl+E/g/G scroll the output area (not the prompt)
                 if key.code == KeyCode::PageUp
                     || key.code == KeyCode::PageDown
                     || (key.code == KeyCode::Char('y') && key.modifiers == helix_view::input::KeyModifiers::CONTROL)
                     || (key.code == KeyCode::Char('d') && key.modifiers == helix_view::input::KeyModifiers::CONTROL)
+                    || key.code == KeyCode::Char('g')
+                    || key.code == KeyCode::Char('G')
                 {
-                    // Map Ctrl+Y/Ctrl+E to PageUp/PageDown for the output
-                    let scroll_event = if key.code == KeyCode::PageUp
-                        || (key.code == KeyCode::Char('y') && key.modifiers == helix_view::input::KeyModifiers::CONTROL)
-                    {
-                        Event::Key(helix_view::input::KeyEvent {
-                            code: KeyCode::PageUp,
-                            modifiers: helix_view::input::KeyModifiers::NONE,
-                        })
-                    } else {
-                        Event::Key(helix_view::input::KeyEvent {
-                            code: KeyCode::PageDown,
-                            modifiers: helix_view::input::KeyModifiers::NONE,
-                        })
-                    };
-                    return self.output.handle_event(&scroll_event, ctx);
+                    // Route scroll keys to output
+                    return self.output.handle_event(event, ctx);
                 }
 
                 // All other keys go to the prompt
@@ -124,13 +114,21 @@ impl Component for AgentPanel {
             self.prompt.clear(ctx.editor);
         }
 
-        // Sync prompt -> session for submission.
-        // The prompt owns its state; session is just a mirror for agent_submit.
+        // Sync prompt <-> session bidirectionally.
+        // - prompt -> session: keeps session mirror up to date for agent_submit
+        // - session -> prompt: picks up pre-filled text from agent_ask_at_cursor
         {
             let prompt_input = self.prompt.line().clone();
             let mut session = ctx.editor.agent_session.prompt_input.write().unwrap();
             if *session != prompt_input {
-                *session = prompt_input;
+                // If session has content but prompt is empty, session was pre-filled externally
+                // (e.g., by agent_ask_at_cursor). Copy session -> prompt.
+                if !session.is_empty() && prompt_input.is_empty() {
+                    self.prompt.set_line(session.clone(), ctx.editor);
+                } else {
+                    // Otherwise prompt changed (user typing). Copy prompt -> session.
+                    *session = prompt_input;
+                }
             }
         }
 

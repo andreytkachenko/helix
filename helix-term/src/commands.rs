@@ -630,6 +630,7 @@ impl MappableCommand {
         agent_append_mode, "Append mode from agent mode",
         agent_insert_at_line_end, "Insert at line end from agent mode",
         agent_insert_at_line_start, "Insert at line start from agent mode",
+        agent_ask_at_cursor, "Open agent panel with cursor/selection context",
         agent_stop, "Stop the current agent execution",
         agent_clear, "Clear the agent conversation",
     );

@@ -516,6 +516,8 @@ pub struct AgentConfig {
     pub system_prompt: Option<String>,
     /// Tool configuration.
     pub tools: AgentToolsConfig,
+    /// If true, automatically save open buffers after write/edit tool execution.
+    pub autosave: bool,
 }
 
 impl Default for AgentConfig {
@@ -528,6 +530,7 @@ impl Default for AgentConfig {
             thinking_level: helix_agent::agent::ThinkingLevel::Off,
             system_prompt: None,
             tools: AgentToolsConfig::default(),
+            autosave: true,
         }
     }
 }
@@ -572,6 +575,8 @@ pub struct AgentSession {
     pub document_updates: std::sync::Arc<std::sync::RwLock<Vec<DocumentUpdate>>>,
     /// Whether the agent panel is currently visible on the compositor.
     pub panel_visible: bool,
+    /// Captured cursor/selection context (set by agent_ask_at_cursor, consumed on submit).
+    pub cursor_context: std::sync::Arc<std::sync::RwLock<Option<String>>>,
 }
 
 /// An active tool call in progress.
@@ -637,6 +642,7 @@ impl Default for AgentSession {
             agent_tools_config: None,
             document_updates: std::sync::Arc::new(std::sync::RwLock::new(Vec::new())),
             panel_visible: false,
+            cursor_context: std::sync::Arc::new(std::sync::RwLock::new(None)),
         }
     }
 }
